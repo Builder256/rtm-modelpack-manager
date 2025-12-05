@@ -1,38 +1,23 @@
-# sv
+# RTM ModelPack Manager
+RTM ModelPack Managerは、RTMのModelPackを管理するためのWebアプリ形式のツールです。
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+## 機能
+modsディレクトリを選択してModelPackのZIPファイルを取得し、CSV形式のModリストと比較して不足分を表示します。
 
-## Creating a project
+URLに直リンクが設定されている場合、その場で直接ダウンロードすることができます。
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Modリストの形式
+CSVファイルの形式は以下の通りです。
 
-```sh
-# create a new project in the current directory
-npx sv create
+| Name | URL | Author | Description | Dependencies |
+| --- | --- | --- | --- | --- |
+| ModelPackのファイル名<br>拡張子含め実際のファイル名と完全一致 | ダウンロードURL | 作者名 | 説明 | 前提のファイル名 |
 
-# create a new project in my-app
-npx sv create my-app
-```
+この列の形式は必ずしも一致している必要はなく、セルの内容に応じて簡易的ながら自動判別が行われるため、ある程度の誤差は許容されます。
 
-## Developing
+## 前提条件
+このツールでは、ブラウザがFile System Access APIをサポートしている必要があります。
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+File System Access APIは、Google ChromeやMicrosoft Edge、Operaなど、Chromiumベースのブラウザで主に対応しています。
 
-```sh
-npm run dev
-
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
-
-## Building
-
-To create a production version of your app:
-
-```sh
-npm run build
-```
-
-You can preview the production build with `npm run preview`.
-
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+Mozilla FirefoxやSafariなど、ユーザーの安全を重視するブラウザの場合には、File System Access APIは意図的に対応しない方針であったり、デフォルト設定で無効化されている場合があるため、対応ブラウザを使用するかブラウザの設定を変更する必要があります。
