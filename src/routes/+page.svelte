@@ -4,7 +4,6 @@
   // shadcn-svelte components
   import { Button } from '$lib/components/ui/button/index';
   import { Input } from '$lib/components/ui/input/index.js';
-  import * as Dialog from '$lib/components/ui/dialog/index';
   import { toast } from 'svelte-sonner';
   // Lucide Svelte icons
   import {
@@ -17,29 +16,13 @@
   } from '@lucide/svelte';
   // JavaScript Libraries
   import Papa from 'papaparse'; // CSVパーサー
+  // Svelte Components
+  import Dialog from './dialog.svelte';
+  import Link from '$lib/components/link.svelte';
+  import PackInfoTable from './PackInfoTable.svelte';
   // TypeScript Modules
-  import { getBrowsersWhichSupportFeature } from '../ciu-utils';
   import { inferCsvColumns } from '$lib/CsvAnalyzer';
-
-  // --------- Configs ---------
-
-  // (Removed hardcoded CSV_HEADER)
-
-  /// --------- Types ---------
-
-  /** モデルパックの情報 */
-  interface ModelPackInfo {
-    /** ファイルの更新日時 */
-    dateModified: Date | 'unknown';
-    /** ファイル名 */
-    name: string;
-    /** URL */
-    url?: URL;
-    /** 説明 */
-    description?: string;
-    /** 前提モデルパックの名前 */
-    dependencies?: string[];
-  }
+  import { type ModelPackInfo } from '$lib/types';
 
   // --------- State ---------
 
@@ -64,10 +47,16 @@
   // --------- UI ---------
 
   // --- dialog status ---
-  let isFSAAPIDialogOpen: boolean = $state(false);
-  let isModsDirLoadDialogOpen: boolean = $state(false);
-  // --- browser support ---
-  let supportedBrowsers: string[] = $state([]);
+  /** File System Access APIのサポート状態を表示するダイアログ */
+  let isFSAAPIDialogOpen = $state<boolean>(false);
+  /** modsディレクトリの読み込み失敗の詳細を表示するダイアログ */
+  let isModsDirLoadFailedDialogOpen = $state<boolean>(false);
+  /** CSVファイルから読み込んだモデルパックの詳細を表示するダイアログ */
+  let isListedPackDialogOpen = $state<boolean>(false);
+  /** modsディレクトリにあるmodelpackの詳細を表示するダイアログ*/
+  let isInstalledPackDialogOpen = $state<boolean>(false);
+  /** Modリストの詳細を表示するダイアログ */
+  let isModListDialogOpen = $state<boolean>(false);
 
   /**
    * mods選択ボタンをクリックしたときに呼ばれる
@@ -76,14 +65,12 @@
   async function openModsDir() {
     // サポートしていないブラウザを弾く
     if (!('showDirectoryPicker' in window)) {
-      toast('Modsフォルダの選択に失敗しました。', {
+      toast('modsフォルダの選択に失敗しました。', {
         description: 'ブラウザがFile System Access APIをサポートしていません。',
         action: {
           label: '詳細',
-          onClick: async () => {
+          onClick: () => {
             isFSAAPIDialogOpen = true;
-            if (!supportedBrowsers.length)
-              supportedBrowsers = await getBrowsersWhichSupportFeature('fileSystemAccessAPI');
           }
         }
       });
@@ -99,13 +86,12 @@
     } catch (e) {
       // ブラウザ側で拒否されるシステムファイルへのアクセスができるディレクトリ（.minecraftなど）を選択した場合と、ユーザーによる選択のキャンセルを区別したかったが、どうも全く同じエラーが返され区別できないらしい
       console.error('mods directory selection cancelled or failed', e);
-      toast('Modsフォルダの選択に失敗しました。', {
-        description:
-          '選択をキャンセルしましたか？またはアクセスできないフォルダ（.minecraft内のフォルダなど）を選択しましたか？',
+      toast('modsフォルダの選択に失敗しました。', {
+        description: 'modsフォルダの選択が正常に完了しませんでした。',
         action: {
           label: '詳細',
           onClick: () => {
-            isModsDirLoadDialogOpen = true; // ダイアログを表示
+            isModsDirLoadFailedDialogOpen = true; // ダイアログを表示
           }
         }
       });
@@ -182,9 +168,7 @@
   }
 
   function checkModelPacks() {
-    if (listedPacks.length === 0 && installedPacks.length === 0) {
-      return;
-    }
+    if (listedPacks.length === 0 && installedPacks.length === 0) return;
 
     const listedPackNames = listedPacks.map((item) => item.name);
     const installedPackNames = installedPacks.map((item) => item.name);
@@ -197,67 +181,6 @@
       : listedPackNames.filter((name) => !installedPackNames.includes(name));
   }
 </script>
-
-<!-- File System Access APIのサポートについてのダイアログ -->
-<Dialog.Root open={isFSAAPIDialogOpen} onOpenChange={(open) => (isFSAAPIDialogOpen = open)}>
-  <Dialog.Content>
-    <Dialog.Header>
-      <Dialog.Title>利用できないブラウザ機能</Dialog.Title>
-      <Dialog.Description class="space-y-2 leading-relaxed">
-        <p>
-          ご使用のブラウザが、<a
-            href="https://wicg.github.io/file-system-access/"
-            target="_blank"
-            rel="noreferrer"
-            class="underline underline-offset-2">File System Access API</a
-          >をサポートしていません。
-        </p>
-        <p>
-          このサイトでは、modsフォルダの内容を取得するためにFile System Access APIを使用しています。
-        </p>
-      </Dialog.Description>
-      <div>
-        <p>File System Access APIをサポートするブラウザ</p>
-        <ul class="my-2 ml-6 list-disc space-y-2 text-sm text-neutral-400">
-          {#each supportedBrowsers as browser}
-            <li>{browser}</li>
-          {/each}
-        </ul>
-        <p class="text-sm text-neutral-400">
-          これらのブラウザ、またはその系列ブラウザを使用しているにもかかわらず警告が表示された場合は、ブラウザの設定を確認してください。
-        </p>
-      </div>
-      <Dialog.Footer></Dialog.Footer>
-    </Dialog.Header>
-  </Dialog.Content>
-</Dialog.Root>
-
-<!-- modsフォルダを選択できなかった場合のダイアログ -->
-<Dialog.Root
-  open={isModsDirLoadDialogOpen}
-  onOpenChange={(open) => (isModsDirLoadDialogOpen = open)}
->
-  <Dialog.Content>
-    <Dialog.Header>
-      <Dialog.Title>modsフォルダの読み込みに失敗</Dialog.Title>
-      <Dialog.Description class="space-y-2 leading-relaxed">
-        <p>modsフォルダの選択が正常に完了しませんでした。</p>
-        <p>
-          選択をキャンセルした、またはアクセスできないフォルダ（<code>.minecraft</code
-          >内のフォルダなど）を選択した可能性があります。
-        </p>
-        <p>
-          modsフォルダを<code>.minecraft</code
-          >以下に配置している場合など、ブラウザによって保護されているシステムフォルダ内に配置している場合、このサイトからmodsフォルダにアクセスすることができません。
-        </p>
-        <p>
-          誠に申し訳ありませんが、ゲームの起動構成を変更して、アクセスできるフォルダ内にmodsフォルダを配置するようにしてください。
-        </p>
-      </Dialog.Description>
-      <Dialog.Footer></Dialog.Footer>
-    </Dialog.Header>
-  </Dialog.Content>
-</Dialog.Root>
 
 <div class="min-h-screen bg-neutral-900 p-8 font-sans text-neutral-100 selection:bg-rose-600/40">
   <main class="mx-auto max-w-6xl space-y-8">
@@ -289,6 +212,7 @@
           </div>
         </div>
       {/snippet}
+      <!-- mods入力 -->
 
       {#snippet folderOpenIcon()}
         <FolderOpen class="size-6" />
@@ -310,17 +234,21 @@
 
         {#if installedPacks.length > 0}
           <div
-            class="flex items-center gap-2 rounded-lg border border-green-400/20 bg-green-400/10 p-3 text-sm text-green-400"
+            class="flex items-center justify-between rounded-lg border border-green-400/20 bg-green-400/10 p-3 text-sm text-green-400"
           >
-            <CircleCheckBig class="size-4" />
-            <span>{installedPacks.length} 個のzipファイルを検出</span>
+            <div class="flex items-center gap-2">
+              <CircleCheckBig class="size-4" />
+              <span>{installedPacks.length} 個のzipファイルを検出</span>
+            </div>
+            <Button variant="outline" size="sm" onclick={() => (isInstalledPackDialogOpen = true)}
+              >詳細</Button
+            >
           </div>
         {:else}
           <div
             class="flex items-center gap-2 rounded-lg border border-neutral-700 bg-neutral-900/50 p-3 text-sm text-neutral-500"
           >
             <FileQuestionMark class="size-4" />
-
             <span>未選択</span>
           </div>
         {/if}
@@ -328,6 +256,7 @@
 
       {@render card('Mods Directory', folderOpenIcon, modsCardContent)}
 
+      <!-- Modリスト入力 -->
       {#snippet fileSpreadsheetIcon()}
         <FileSpreadsheet class="size-6" />
       {/snippet}
@@ -347,10 +276,15 @@
 
         {#if listedPacks.length > 0}
           <div
-            class="flex items-center gap-2 rounded-lg border border-green-400/20 bg-green-400/10 p-3 text-sm text-green-400"
+            class="flex items-center justify-between gap-2 rounded-lg border border-green-400/20 bg-green-400/10 p-3 text-sm text-green-400"
           >
-            <CircleCheckBig class="size-4" />
-            <span>{listedPacks.length} 個のModelPackを検出</span>
+            <div class="flex items-center gap-2">
+              <CircleCheckBig class="size-4" />
+              <span>{listedPacks.length} 個のModelPackを検出</span>
+            </div>
+            <Button variant="outline" size="sm" onclick={() => (isListedPackDialogOpen = true)}
+              >詳細</Button
+            >
           </div>
         {:else}
           <div
@@ -427,3 +361,63 @@
     {/if}
   </main>
 </div>
+<!-- File System Access API 未サポート -->
+<Dialog
+  title="利用できないブラウザ機能"
+  description="ブラウザが、File System Access APIをサポートしていません。"
+  bind:isOpen={isFSAAPIDialogOpen}
+>
+  <article class="space-y-4">
+    <h3 class="font-semibold">詳細</h3>
+    <p class="text-sm text-neutral-400">
+      このサイトでは、modsフォルダの内容を取得するために
+      <Link href="https://wicg.github.io/file-system-access/" target="_blank" rel="noreferrer"
+        >File System Access API</Link
+      >
+      を使用しています。
+    </p>
+    <h3 class="font-semibold">File System Access APIをサポートするブラウザ</h3>
+    <ul class="my-2 ml-6 list-disc space-y-2 text-sm text-neutral-400">
+      <li>Microsoft Edge</li>
+      <li>Google Chrome</li>
+      <li>Opera</li>
+    </ul>
+    <p class="text-sm text-neutral-400">
+      これらのブラウザ、またはその系列ブラウザを使用しているにもかかわらず警告が表示された場合は、ブラウザの設定を確認してください。
+    </p>
+  </article>
+</Dialog>
+<!-- modsディレクトリ選択キャンセル or システムフォルダ -->
+<Dialog
+  title="modsフォルダの読み込みに失敗"
+  description="modsフォルダの選択が正常に完了しませんでした。"
+  bind:isOpen={isModsDirLoadFailedDialogOpen}
+>
+  <article class="space-y-4">
+    <h3 class="font-semibold">詳細</h3>
+    <p class="text-sm text-neutral-400">
+      選択をキャンセルした、またはアクセスできないフォルダ（<code>.minecraft</code
+      >内のフォルダなど）を選択した可能性があります。
+    </p>
+    <h3 class="font-semibold">アクセスできないフォルダについて</h3>
+    <p class="text-sm text-neutral-400">
+      modsフォルダを<code>.minecraft</code
+      >以下に配置している場合など、ブラウザによって保護されているシステムフォルダ内に配置している場合、このサイトからmodsフォルダにアクセスすることができません。
+    </p>
+    <p class="text-sm text-neutral-400">
+      ゲームの起動構成を変更して、アクセスできるフォルダ内にmodsフォルダを配置するようにしてください。
+    </p>
+  </article>
+</Dialog>
+<!-- modsフォルダ詳細 -->
+<Dialog
+  title="modsフォルダのモデルパック"
+  description="modsフォルダにあるモデルパックの一覧"
+  bind:isOpen={isInstalledPackDialogOpen}
+>
+  <PackInfoTable packInfos={installedPacks} />
+</Dialog>
+<!-- Modリスト詳細 -->
+<Dialog title="Modリスト" description="Modリストの詳細" bind:isOpen={isListedPackDialogOpen}>
+  <PackInfoTable packInfos={listedPacks} />
+</Dialog>
